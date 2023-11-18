@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">BlockTimer</string>
+    <string name="title_activity_timer">TimerActivity</string>
+    <string name="title_activity_schedule">ScheduleActivity</string>
+</resources>
