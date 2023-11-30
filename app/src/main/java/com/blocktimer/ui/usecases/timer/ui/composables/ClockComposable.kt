@@ -1,4 +1,4 @@
-package com.blocktimer.ui
+package com.blocktimer.ui.usecases.timer.ui.composables
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -6,7 +6,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.center

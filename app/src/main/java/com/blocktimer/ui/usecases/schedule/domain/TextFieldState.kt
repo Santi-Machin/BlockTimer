@@ -1,4 +1,4 @@
-package com.blocktimer
+package com.blocktimer.ui.usecases.schedule.domain
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf

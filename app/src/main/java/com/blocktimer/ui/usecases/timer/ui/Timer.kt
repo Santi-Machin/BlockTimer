@@ -1,4 +1,4 @@
-package com.blocktimer
+package com.blocktimer.ui.usecases.timer.ui
 
 
 import android.util.Log
@@ -8,13 +8,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -25,23 +24,30 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat.getSystemService
-import androidx.lifecycle.MutableLiveData
 import androidx.navigation.NavHostController
-import com.blocktimer.ui.AnalogClockComposable
+import com.blocktimer.R
+import com.blocktimer.ui.usecases.timer.ui.composables.AnalogClockComposable
 import com.blocktimer.ui.theme.Black
 import com.blocktimer.ui.theme.BlockTimerTheme
 import com.blocktimer.ui.theme.White
+import com.blocktimer.ui.usecases.schedule.ui.ScheduleViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
-fun TimerScreen(navController: NavHostController) {
+fun TimerScreen(navController: NavHostController, viewModel: ScheduleViewModel, secondViewModel: TimerViewModel) {
+    val nameMapCache: Map<String, MutableList<MutableList<String?>>> by viewModel.nameMapsCache.observeAsState(emptyMap())
+    val today = (LocalDate.now()).format(DateTimeFormatter.ofPattern("yyyy/MM/dd"))
+
+    val taskTime: Pair<Int, Int> by secondViewModel.taskTime.observeAsState(Pair(0,0))
+    val isTaskCompled: Boolean? by secondViewModel.isTaskCompleted.observeAsState(false)
+    val actualTask: String? by secondViewModel.actualTask.observeAsState(null)
+
+    viewModel.resetValues()
+
     BlockTimerTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -53,11 +59,11 @@ fun TimerScreen(navController: NavHostController) {
             ) {
                 // TODO --> HACER LOS SPACERS RESPONSIVES
                 Clock()
-                Timer(5, 30)
+                Timer(taskTime)
                 Spacer(modifier = Modifier.height(70.dp))
-                ActualActivity()
+                ActualActivity(nameMapCache[today], secondViewModel, actualTask)
                 Spacer(modifier = Modifier.height(20.dp))
-                CompletedButton()
+                CompletedButton(viewModel, secondViewModel, nameMapCache[today])
                 Spacer(modifier = Modifier.height(10.dp))
                 ScheduleButton(navController)
                 Spacer(modifier = Modifier.height(10.dp))
@@ -77,11 +83,15 @@ fun Clock() {
 }
 
 @Composable
-fun Timer(h: Int, m: Int) {
-    val totalSeconds = h * 3600 + m * 60
-    var remainingSeconds by remember { mutableStateOf(totalSeconds) }
+fun Timer(taskTime: Pair<Int, Int>) {
+    val h = taskTime.second
+    val m = taskTime.first
 
-    LaunchedEffect(Unit) {
+    val totalSeconds = h * 3600 + m * 60
+    var remainingSeconds by remember(taskTime) { mutableStateOf(totalSeconds) }
+
+    LaunchedEffect(taskTime) {
+
         while (remainingSeconds > 0) {
             remainingSeconds--
             delay(1000)
@@ -104,8 +114,9 @@ fun Timer(h: Int, m: Int) {
 }
 
 @Composable
-fun ActualActivity() {
-    val actualTask by remember { derivedStateOf { getCurrentTask(nameMap) } }
+fun ActualActivity(nameMap: MutableList<MutableList<String?>>?, secondViewModel: TimerViewModel, actualTask: String?) {
+
+    secondViewModel.getCurrentTask(nameMap)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -124,9 +135,10 @@ fun ActualActivity() {
         )
 
         Spacer(modifier = Modifier.height(20.dp))
+        Log.i("prueba", "$actualTask")
 
         Text(
-            text = modifyString(if(actualTask != null) actualTask!! else "No activity is scheduled for now"),
+            text = modifyString(actualTask ?: "No activity is scheduled for now"),
             style = TextStyle(
                 fontFamily = FontFamily(Font(R.font.sometypemono_regular)),
                 fontSize = 17.sp,
@@ -138,10 +150,10 @@ fun ActualActivity() {
 }
 
 @Composable
-fun CompletedButton() {
+fun CompletedButton(viewModel: ScheduleViewModel, secondViewModel: TimerViewModel, nameMap: MutableList<MutableList<String?>>?, ) {
     Button(
         onClick = {
-            //your onclick code
+            secondViewModel.setCompleted(nameMap)
         },
         border = BorderStroke(1.dp, White),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = Black),
@@ -241,20 +253,3 @@ fun modifyString(input: String): String {
     return modifiedString
 }
 
-
-fun getCurrentTask(nameMap: MutableList<MutableList<String?>>): String? {
-    Log.i("currentTask", "Se ejecuto")
-    val mutableHour = mutableStateOf(LocalTime.now())
-
-    val mutableFormattedHour = derivedStateOf {
-        mutableHour.value.format(DateTimeFormatter.ofPattern("HH:mm"))
-    }
-
-    val hourIndex = mutableFormattedHour.value.substring(0, 2).toInt()
-    Log.i("currentTask", "hourIndex  = $hourIndex")
-    val minuteIndex = mutableFormattedHour.value.substring(3).toInt() / 10
-    Log.i("currentTask", "minuteIndex  = $minuteIndex")
-
-    Log.i("currentTask", "nameMap = ${nameMap[hourIndex][minuteIndex] }")
-    return nameMap[hourIndex][minuteIndex]
-}

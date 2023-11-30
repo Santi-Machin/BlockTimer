@@ -1,26 +1,33 @@
 package com.blocktimer
 
+import android.content.Context
 import android.graphics.Point
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Vibrator
-import android.util.Log
 import android.view.Display
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
-import androidx.core.content.ContextCompat
+import androidx.datastore.preferences.preferencesDataStore
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.blocktimer.ui.usecases.schedule.ui.ScheduleScreen
+import com.blocktimer.ui.usecases.schedule.ui.ScheduleViewModel
+import com.blocktimer.ui.usecases.timer.ui.TimerScreen
+import com.blocktimer.ui.usecases.timer.ui.TimerViewModel
 
+val Context.dataStore by preferencesDataStore(name = "DATA")
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val scheduleViewModel: ScheduleViewModel = ScheduleViewModel(dataStore)
+        val timerViewModel: TimerViewModel = TimerViewModel()
         val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val displayManager = getSystemService(DISPLAY_SERVICE) as DisplayManager
         val vibratorService = getSystemService(VIBRATOR_SERVICE) as Vibrator?
@@ -28,7 +35,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             val navController = rememberNavController()
             val screenParameters = ScreenSize(windowManager, displayManager)
-            Log.i("screen_params", "Device width: ${screenParameters.first}, device height: ${screenParameters.second}")
 
             NavHost(
                 navController = navController,
@@ -40,11 +46,11 @@ class MainActivity : ComponentActivity() {
                 }
 
                 composable("timer"){
-                    TimerScreen(navController)
+                    TimerScreen(navController, scheduleViewModel, timerViewModel)
                 }
 
                 composable("schedule"){
-                    ScheduleScreen(navController, screenParameters, vibratorService)
+                    ScheduleScreen(scheduleViewModel, timerViewModel ,navController, screenParameters, vibratorService)
                 }
 
             }
