@@ -46,7 +46,7 @@ fun TimerScreen(navController: NavHostController, viewModel: ScheduleViewModel, 
     val isTaskCompled: Boolean? by secondViewModel.isTaskCompleted.observeAsState(false)
     val actualTask: String? by secondViewModel.actualTask.observeAsState(null)
 
-    viewModel.resetValues()
+    //viewModel.resetValues()
 
     BlockTimerTheme {
         Surface(

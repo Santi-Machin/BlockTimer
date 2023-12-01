@@ -5,14 +5,20 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.datastore.core.DataStore
 import androidx.datastore.dataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.blocktimer.ui.theme.Black
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewModelScope
 import com.blocktimer.ui.theme.Gray
+import com.blocktimer.ui.usecases.schedule.data.MapsData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -23,7 +29,8 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
-open class ScheduleViewModel(dataStore: DataStore<androidx.datastore.preferences.core.Preferences>): ViewModel() {
+open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
+    DefaultLifecycleObserver {
     private val data = dataStore
 
     private val _isBlockClicked = MutableLiveData<Boolean>(false)
@@ -129,6 +136,12 @@ open class ScheduleViewModel(dataStore: DataStore<androidx.datastore.preferences
 
     init {
         startHourUpdate()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            recoverMapsData()
+            Log.i("mapsData", "_nameMapsCache = ${_nameMapsCache.value}")
+            Log.i("mapsData", "_nameMap = ${_nameMap.value}")
+        }
     }
 
     fun onTaskNameChange(taskName: String) {
@@ -279,12 +292,16 @@ open class ScheduleViewModel(dataStore: DataStore<androidx.datastore.preferences
     }
 
     private suspend fun saveMapsData() {
+        var counter = 0
+
         data.edit { preference ->
             _nameMapsCache.value?.forEach { (key, outerList) ->
                 outerList.forEachIndexed { outerIndex, innerList ->
                     innerList.forEachIndexed { innerIndex, element ->
-                        preference[stringPreferencesKey("nameMap[$key][$outerIndex][$innerIndex]")] =
-                            element.orEmpty()
+                        preference[stringPreferencesKey("nameMapKey[$counter]")] = "nameMap[$key][$outerIndex][$innerIndex]"
+                        preference[stringPreferencesKey("nameMap[$key][$outerIndex][$innerIndex]")] = element ?: "null"
+                        Log.i("saveMapsData", "Se salvo nameMap[$key][$outerIndex][$innerIndex]: $element")
+                        counter++
                     }
                 }
             }
@@ -292,8 +309,8 @@ open class ScheduleViewModel(dataStore: DataStore<androidx.datastore.preferences
             _iconMapsCache.value?.forEach { (key, outerList) ->
                 outerList.forEachIndexed { outerIndex, innerList ->
                     innerList.forEachIndexed { innerIndex, element ->
-                        preference[intPreferencesKey("iconMap[$key][$outerIndex][$innerIndex]")] =
-                            element
+                        preference[stringPreferencesKey("iconMapKey[$counter]")] = "iconMap[$key][$outerIndex][$innerIndex]"
+                        preference[intPreferencesKey("iconMap[$key][$outerIndex][$innerIndex]")] = element
                     }
                 }
             }
@@ -301,8 +318,114 @@ open class ScheduleViewModel(dataStore: DataStore<androidx.datastore.preferences
     }
 
     private suspend fun recoverMapsData() {
-        data.data.map {preferences ->
-            preferences
+        Log.i("MapsRecovering", "recovering maps data")
+        try {
+            data.data.collect { preferences ->
+                var stop = false
+                val preferencesNames: MutableList<String> = mutableListOf()
+                var counter = 0
+
+                while (!stop) {
+                    val preference = preferences[stringPreferencesKey("nameMapKey[$counter]")]
+                    if(preference.isNullOrEmpty()) {
+                        Log.i("MapsRecovering", "Preferences is null or empty. stopping bucle")
+                        stop = true
+                    } else {
+                        Log.i("MapsRecovering", "preference $preference added to preferencesNames")
+                        preferencesNames.add(preference)
+                    }
+
+                    counter++
+                }
+
+                for(name in preferencesNames) {
+                    val preference = preferences[stringPreferencesKey(name)]
+                    if (!preference.isNullOrEmpty()) {
+                        Log.i("MapsRecovering", "Rebuilding $preference, in name $name")
+                        rebuildNameMap(name, preference)
+                    }
+                }
+
+                Log.i("rebuildNameMap", "Finalizo.")
+                Log.i("rebuildNameMap", "_nameMapsCache = ${_nameMapsCache.value}")
+
+                Log.i("MapsRecovering", "_nameMapsCache = ${_nameMapsCache.value}")
+            }
+        } catch (e: Exception) {
+            Log.e("dbWriting", "An error occurred: ${e.message}")
+        }
+
+        try {
+            data.data.collect { preferences ->
+                var stop = false
+                val preferencesNames: MutableList<String> = mutableListOf()
+                var counter = 0
+
+                while (!stop) {
+                    val preference = preferences[stringPreferencesKey("iconMapKey[$counter]")]
+
+                    if(preference.isNullOrEmpty()) {
+                        stop = true
+                    } else {
+                        preferencesNames.add(preference)
+                    }
+
+                    counter++
+                }
+
+
+                for(name in preferencesNames) {
+                    val preference = preferences[intPreferencesKey(name)]
+                    if (preference != null) {
+                        rebuildIconMap(name, preference)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("dbWriting", "An error occurred: ${e.message}")
+        }
+
+    }
+
+    private fun rebuildNameMap(nameMapName: String, nameMapPiece: String) {
+        Log.i("rebuildNameMap", "Se ejecuto rebuildNameMap con -> nameMapName = $nameMapName, nameMapPiece = $nameMapPiece")
+        val regex = Regex("\\[(\\d+/\\d+/\\d+)\\]\\[(\\d+)\\]\\[(\\d+)\\]")
+        val matchResult = regex.find(nameMapName)
+
+        if(matchResult != null) {
+            val (date, firstNumber, secondNumber) = matchResult.destructured
+            Log.i("test101", "${_nameMapsCache.value?.get(date)?.get(firstNumber.toInt())?.get(secondNumber.toInt())}")
+            _nameMapsCache.value?.get(date)
+                ?.get(firstNumber.toInt())?.set(secondNumber.toInt(),
+                    if(nameMapPiece == "null") null else nameMapPiece)
+
+            Log.i("rebuildNameMap", "se guardo el $nameMapPiece, en el indice _nameMapsCache[$date][${firstNumber.toInt()}][${secondNumber.toInt()}]")
+            Log.i("rebuildNameMap", "_nameMapsCache[$date][${firstNumber.toInt()}][${secondNumber.toInt()}] = ${_nameMapsCache.value?.get(date)?.get(firstNumber.toInt())?.get(secondNumber.toInt())}")
+
+            Log.i("dbWriting", "saved $nameMapPiece in [$date][$firstNumber][$secondNumber]")
+        }
+    }
+
+
+    private fun rebuildIconMap(iconMapName: String, iconMapIcon: Int) {
+        val regex = Regex("\\[(\\d+/\\d+/\\d+)\\]\\[(\\d+)\\]\\[(\\d+)\\]")
+        val matchResult = regex.find(iconMapName)
+
+        if(matchResult != null) {
+            val (date, firstNumber, secondNumber) = matchResult.destructured
+            _iconMapsCache.value?.get(date)
+                ?.get(firstNumber.toInt())?.set(secondNumber.toInt(), iconMapIcon)
+
+        }
+    }
+
+    override fun onPause(owner: LifecycleOwner) {
+        super.onPause(owner)
+
+        Log.i("Life", "Se ejecute onPause()")
+
+        viewModelScope.launch(Dispatchers.IO) {
+            saveMapsData()
         }
     }
 }

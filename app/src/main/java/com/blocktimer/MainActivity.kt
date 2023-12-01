@@ -11,6 +11,8 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -20,7 +22,7 @@ import com.blocktimer.ui.usecases.schedule.ui.ScheduleViewModel
 import com.blocktimer.ui.usecases.timer.ui.TimerScreen
 import com.blocktimer.ui.usecases.timer.ui.TimerViewModel
 
-val Context.dataStore by preferencesDataStore(name = "DATA")
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "DATA")
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,6 +33,8 @@ class MainActivity : ComponentActivity() {
         val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val displayManager = getSystemService(DISPLAY_SERVICE) as DisplayManager
         val vibratorService = getSystemService(VIBRATOR_SERVICE) as Vibrator?
+
+        lifecycle.addObserver(scheduleViewModel)
 
         setContent {
             val navController = rememberNavController()
@@ -57,6 +61,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+
 
 // TODO --> REMAKE ALL THIS SHIT AND MAKE REAL RESPONSIVENESS BASED ON OFFICIAL DOCS
 @Composable
