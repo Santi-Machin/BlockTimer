@@ -57,6 +57,7 @@ class TimerViewModel: ViewModel() {
 
     private fun setTaskTime(nameMap: MutableList<MutableList<String?>>?) {
         clearTaskTime()
+
         if (nameMap != null) {
             Log.i("setTime", "namemap = $nameMap")
 

@@ -115,7 +115,6 @@ fun Timer(taskTime: Pair<Int, Int>) {
 
 @Composable
 fun ActualActivity(nameMap: MutableList<MutableList<String?>>?, secondViewModel: TimerViewModel, actualTask: String?) {
-
     secondViewModel.getCurrentTask(nameMap)
 
     Column(
@@ -138,7 +137,7 @@ fun ActualActivity(nameMap: MutableList<MutableList<String?>>?, secondViewModel:
         Log.i("prueba", "$actualTask")
 
         Text(
-            text = modifyString(actualTask ?: "No activity is scheduled for now"),
+            text = modifyString(if(actualTask.isNullOrEmpty() || actualTask == "null")  "No activity is scheduled for now" else actualTask),
             style = TextStyle(
                 fontFamily = FontFamily(Font(R.font.sometypemono_regular)),
                 fontSize = 17.sp,

@@ -163,6 +163,8 @@ fun ScheduleScreen(
         mutableListOf<Boolean>(false, false, false, false, false, false), // 00
     ))
 
+    Log.i("prueba5", "$nameMap")
+
     BlockTimerTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),

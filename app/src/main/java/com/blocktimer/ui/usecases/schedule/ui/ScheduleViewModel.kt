@@ -2,6 +2,10 @@ package com.blocktimer.ui.usecases.schedule.ui
 
 import android.util.Log
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.datastore.core.DataStore
 import androidx.datastore.dataStore
@@ -24,10 +28,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     DefaultLifecycleObserver {
@@ -175,9 +182,11 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     }
 
     fun onTaskIconClicked() {
+        Log.i("onTaskIconClicked", "Se ejectuo la funcion onTaskIconClicked()")
         _isBlockClicked.value = false
         _clearBlocks.value = true
         _currentName.value = _taskName.value
+        Log.i("onTaskIconClicked", "_currentName.value se seteo en ${_currentName.value}")
 
         for(i in _iconCoords.value!!) {
             setName(i.first, i.second, _currentName.value)
@@ -257,7 +266,6 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     }
 
     fun setBlockColor(blockRow: Int, blockColumn: Int, currentHour: LocalTime, completedMap: MutableList<MutableList<Boolean>>): Color? {
-
         val mutableFormattedHour = derivedStateOf { currentHour.format(DateTimeFormatter.ofPattern("HH:mm")) }
         val hourIndex = mutableFormattedHour.value.substring(0, 2).toInt()
         val minuteIndex = mutableFormattedHour.value.substring(3).toInt() / 10
@@ -275,9 +283,12 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
             }
         }
         else {
-            _blockColor.value = Black
+            if((_today.value)?.isBefore(LocalDate.now()) == true) {
+                _blockColor.value = Gray
+            } else {
+                _blockColor.value = Black
+            }
         }
-
         return _blockColor.value
     }
 
@@ -292,25 +303,33 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     }
 
     private suspend fun saveMapsData() {
-        var counter = 0
+        data.edit { preferences -> preferences.clear() }
 
+        Log.i("saveMapsData", "saveMapsData se ejecuto")
+        var counter = 0
+        var counter1 = 0
+
+        // salvamos un valor que tiene, que tiene un string que sirve de key del valor que agarramos del map y lo
+        // guardamos bajo el nombre de esa key.
         data.edit { preference ->
+            // los valores de _nameMapsCache se guardan bien en dataStore
             _nameMapsCache.value?.forEach { (key, outerList) ->
                 outerList.forEachIndexed { outerIndex, innerList ->
                     innerList.forEachIndexed { innerIndex, element ->
                         preference[stringPreferencesKey("nameMapKey[$counter]")] = "nameMap[$key][$outerIndex][$innerIndex]"
                         preference[stringPreferencesKey("nameMap[$key][$outerIndex][$innerIndex]")] = element ?: "null"
-                        Log.i("saveMapsData", "Se salvo nameMap[$key][$outerIndex][$innerIndex]: $element")
                         counter++
                     }
                 }
             }
 
+            // los valores de _iconMapsCache se guardan bien en dataStore
             _iconMapsCache.value?.forEach { (key, outerList) ->
                 outerList.forEachIndexed { outerIndex, innerList ->
                     innerList.forEachIndexed { innerIndex, element ->
-                        preference[stringPreferencesKey("iconMapKey[$counter]")] = "iconMap[$key][$outerIndex][$innerIndex]"
+                        preference[stringPreferencesKey("iconMapKey[$counter1]")] = "iconMap[$key][$outerIndex][$innerIndex]"
                         preference[intPreferencesKey("iconMap[$key][$outerIndex][$innerIndex]")] = element
+                        counter1++
                     }
                 }
             }
@@ -318,91 +337,95 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     }
 
     private suspend fun recoverMapsData() {
-        Log.i("MapsRecovering", "recovering maps data")
         try {
             data.data.collect { preferences ->
-                var stop = false
-                val preferencesNames: MutableList<String> = mutableListOf()
-                var counter = 0
-
-                while (!stop) {
-                    val preference = preferences[stringPreferencesKey("nameMapKey[$counter]")]
-                    if(preference.isNullOrEmpty()) {
-                        Log.i("MapsRecovering", "Preferences is null or empty. stopping bucle")
-                        stop = true
-                    } else {
-                        Log.i("MapsRecovering", "preference $preference added to preferencesNames")
-                        preferencesNames.add(preference)
-                    }
-
-                    counter++
-                }
-
-                for(name in preferencesNames) {
-                    val preference = preferences[stringPreferencesKey(name)]
-                    if (!preference.isNullOrEmpty()) {
-                        Log.i("MapsRecovering", "Rebuilding $preference, in name $name")
-                        rebuildNameMap(name, preference)
-                    }
-                }
-
-                Log.i("rebuildNameMap", "Finalizo.")
-                Log.i("rebuildNameMap", "_nameMapsCache = ${_nameMapsCache.value}")
-
-                Log.i("MapsRecovering", "_nameMapsCache = ${_nameMapsCache.value}")
+                recoverNameMaps(preferences)
+                recoverIconMaps(preferences)
             }
         } catch (e: Exception) {
-            Log.e("dbWriting", "An error occurred: ${e.message}")
+
         }
+    }
 
-        try {
-            data.data.collect { preferences ->
-                var stop = false
-                val preferencesNames: MutableList<String> = mutableListOf()
-                var counter = 0
+    // Los datos se recuperan de dataStore correctamente despues de la destruccion de la activty y se los pasan rebuildIconMap()
+    private suspend fun recoverIconMaps(preferences: Preferences) {
+        var stop = false
+        val preferencesNames: MutableList<String> = mutableListOf()
+        var counter = 0
 
-                while (!stop) {
-                    val preference = preferences[stringPreferencesKey("iconMapKey[$counter]")]
-
-                    if(preference.isNullOrEmpty()) {
-                        stop = true
-                    } else {
-                        preferencesNames.add(preference)
-                    }
-
-                    counter++
-                }
-
-
-                for(name in preferencesNames) {
-                    val preference = preferences[intPreferencesKey(name)]
-                    if (preference != null) {
-                        rebuildIconMap(name, preference)
-                    }
-                }
+        while (!stop) {
+            val preference = preferences[stringPreferencesKey("iconMapKey[$counter]")]
+            if(preference.isNullOrEmpty()) {
+                stop = true
+            } else {
+                preferencesNames.add(preference)
             }
-        } catch (e: Exception) {
-            Log.e("dbWriting", "An error occurred: ${e.message}")
+
+            counter++
         }
 
+        for(name in preferencesNames) {
+            val preference = preferences[intPreferencesKey(name)]
+            if (preference != null) {
+                rebuildIconMap(name, preference)
+            }
+        }
+    }
+
+    // Los datos se recuperan de dataStore correctamente despues de la destruccion de la activty y se los pasan rebuildNameMap()
+    private suspend fun recoverNameMaps(preferences: Preferences) {
+        Log.i("recoverMapsData", "La funcion recoverNameMaps recivio: $preferences")
+        var stop = false
+        val preferencesNames: MutableList<String> = mutableListOf()
+        var counter = 0
+
+        while (!stop) {
+            val preference = preferences[stringPreferencesKey("nameMapKey[$counter]")]
+            Log.i("recoverMapsData", "la key es $preference")
+            if(preference.isNullOrEmpty()) {
+                stop = true
+            } else {
+                preferencesNames.add(preference)
+            }
+            counter++
+        }
+
+        for(name in preferencesNames) {
+            val preference = preferences[stringPreferencesKey(name)]
+            Log.i("recoverMapsData", "el valor es $preference")
+            if (!preference.isNullOrEmpty()) {
+                Log.i("recoverMapsData", "el valor no es nulo")
+                rebuildNameMap(name, preference)
+            }
+        }
     }
 
     private fun rebuildNameMap(nameMapName: String, nameMapPiece: String) {
-        Log.i("rebuildNameMap", "Se ejecuto rebuildNameMap con -> nameMapName = $nameMapName, nameMapPiece = $nameMapPiece")
+        Log.i("rebuildNameMap", "se ejecutó rebuildNameMap se recibió -> $nameMapName = $nameMapPiece")
         val regex = Regex("\\[(\\d+/\\d+/\\d+)\\]\\[(\\d+)\\]\\[(\\d+)\\]")
         val matchResult = regex.find(nameMapName)
 
-        if(matchResult != null) {
+        if (matchResult != null) {
             val (date, firstNumber, secondNumber) = matchResult.destructured
-            Log.i("test101", "${_nameMapsCache.value?.get(date)?.get(firstNumber.toInt())?.get(secondNumber.toInt())}")
-            _nameMapsCache.value?.get(date)
-                ?.get(firstNumber.toInt())?.set(secondNumber.toInt(),
-                    if(nameMapPiece == "null") null else nameMapPiece)
+            Log.i("rebuildNameMap", "Se desestructuró $nameMapName en $date, $firstNumber, $secondNumber")
 
-            Log.i("rebuildNameMap", "se guardo el $nameMapPiece, en el indice _nameMapsCache[$date][${firstNumber.toInt()}][${secondNumber.toInt()}]")
-            Log.i("rebuildNameMap", "_nameMapsCache[$date][${firstNumber.toInt()}][${secondNumber.toInt()}] = ${_nameMapsCache.value?.get(date)?.get(firstNumber.toInt())?.get(secondNumber.toInt())}")
+            viewModelScope.launch(Dispatchers.Main) {
 
-            Log.i("dbWriting", "saved $nameMapPiece in [$date][$firstNumber][$secondNumber]")
+                if (!_nameMapsCache.value?.containsKey(date)!!) {
+                    _nameMapsCache.value = _nameMapsCache.value?.plus((date to _nameMap.value!!))
+                }
+                val currentCache = _nameMapsCache.value
+                currentCache?.get(date)?.get(firstNumber.toInt())?.set(secondNumber.toInt(), nameMapPiece)
+                _nameMapsCache.value = currentCache
+
+
+                Log.i("rebuildNameMap", "Se guardó el valor " +
+                        "${_nameMapsCache.value?.get(date)?.get(firstNumber.toInt())?.get(secondNumber.toInt())}" +
+                        " en _nameMapsCache.value[$date][${firstNumber.toInt()}][${secondNumber.toInt()}]")
+
+                Log.i("rebuildNameMap", "_nameMapsCache = " +
+                        "${_nameMapsCache.value}")
+            }
         }
     }
 
@@ -413,16 +436,27 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
 
         if(matchResult != null) {
             val (date, firstNumber, secondNumber) = matchResult.destructured
-            _iconMapsCache.value?.get(date)
-                ?.get(firstNumber.toInt())?.set(secondNumber.toInt(), iconMapIcon)
 
+            viewModelScope.launch(Dispatchers.Main) {
+
+                if (!_iconMapsCache.value?.containsKey(date)!!) {
+                    _iconMapsCache.value = _iconMapsCache.value?.plus((date to _iconMap.value!!))
+                }
+                val currentCache = _iconMapsCache.value
+                currentCache?.get(date)?.get(firstNumber.toInt())?.set(secondNumber.toInt(), iconMapIcon)
+                _iconMapsCache.value = currentCache
+
+            }
         }
     }
 
     override fun onPause(owner: LifecycleOwner) {
         super.onPause(owner)
 
-        Log.i("Life", "Se ejecute onPause()")
+        val date = (LocalDate.now()).format(DateTimeFormatter.ofPattern("yyyy/MM/dd"))
+        saveMaps(date)
+
+        Log.i("Life", "Se ejecuto onPause()")
 
         viewModelScope.launch(Dispatchers.IO) {
             saveMapsData()
