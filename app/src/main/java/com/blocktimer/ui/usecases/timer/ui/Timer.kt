@@ -115,7 +115,9 @@ fun Timer(taskTime: Pair<Int, Int>) {
 
 @Composable
 fun ActualActivity(nameMap: MutableList<MutableList<String?>>?, secondViewModel: TimerViewModel, actualTask: String?) {
-    secondViewModel.getCurrentTask(nameMap)
+    LaunchedEffect(nameMap) {
+        secondViewModel.getCurrentTask(nameMap)
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

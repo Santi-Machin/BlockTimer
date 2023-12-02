@@ -65,14 +65,14 @@ class TimerViewModel: ViewModel() {
                 if(index >= _hourIndex) {
                     for((secondIndex, name) in list.withIndex()) {
                         if(secondIndex >= _minuteIndex) {
-                            if (_actualTask.value == name) {
+                            if (_actualTask.value == name && _actualTask.value != "null") {
                                 if (_taskTime.value!!.first < 61) {
                                     _taskTime.value = Pair(_taskTime.value!!.first + (10-_exactMinuteIndex), _taskTime.value!!.second)
                                     _exactMinuteIndex = 0
-                                    Log.i("setTime", "+10 minutos: _tasktime = ${_taskTime.value}")
+                                    Log.i("setTime", "+10 minutos: _tasktime por tarea $name = ${_taskTime.value}")
                                 } else {
                                     _taskTime.value = Pair(_taskTime.value!!.first - 60, _taskTime.value!!.second + 1)
-                                    Log.i("setTime", "+1 hora: _tasktime = ${_taskTime.value}")
+                                    Log.i("setTime", "+1 hora por tarea $name: _tasktime = ${_taskTime.value}")
                                 }
                             }
                         }
@@ -87,6 +87,7 @@ class TimerViewModel: ViewModel() {
     }
 
     private fun setActualTask(actualTask: String?, nameMap: MutableList<MutableList<String?>>?) {
+        Log.i("bucle", "Soy un bucle infinito de setActualTask invocado por getCurrentTask")
         if (actualTask != null) {
             _actualTask.value = actualTask
             setTaskTime(nameMap)
@@ -95,9 +96,10 @@ class TimerViewModel: ViewModel() {
         }
     }
 
-    fun getCurrentTask(nameMap: MutableList<MutableList<String?>>?): String? {
+    fun getCurrentTask(nameMap: MutableList<MutableList<String?>>?) {
+        Log.i("bucle", "Soy un bucle infinito de getCurrentTask")
         setActualTask(nameMap?.get(_hourIndex)?.get(_minuteIndex), nameMap)
-        return nameMap?.get(_hourIndex)?.get(_minuteIndex)
+        //return nameMap?.get(_hourIndex)?.get(_minuteIndex)
     }
 
     fun setCompleted(nameMap: MutableList<MutableList<String?>>?) {

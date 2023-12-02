@@ -42,6 +42,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -57,6 +58,7 @@ import com.blocktimer.R
 import com.blocktimer.ui.usecases.schedule.ui.composables.Block
 import com.blocktimer.ui.theme.Black
 import com.blocktimer.ui.theme.BlockTimerTheme
+import com.blocktimer.ui.theme.Gray
 import com.blocktimer.ui.theme.White
 import com.blocktimer.ui.usecases.timer.ui.TimerViewModel
 import java.sql.Time
@@ -80,6 +82,8 @@ fun ScheduleScreen(
     // Observe the LiveData from ViewModel
     val isBlockClicked: Boolean by viewModel.isBlockClicked.observeAsState(false)
     val clearBlocks: Boolean by viewModel.clearBlocks.observeAsState(false)
+    val isAnIcSelected: Boolean by viewModel.isAnIcSelected.observeAsState(false)
+    val haveName: Boolean by viewModel.haveName.observeAsState(false)
     val nameMap: MutableList<MutableList<String?>> by viewModel.nameMap.observeAsState(mutableListOf(
         mutableListOf<String?>(null, null, null, null, null, null), // 00
         mutableListOf<String?>(null, null, null, null, null, null), // 01
@@ -163,8 +167,6 @@ fun ScheduleScreen(
         mutableListOf<Boolean>(false, false, false, false, false, false), // 00
     ))
 
-    Log.i("prueba5", "$nameMap")
-
     BlockTimerTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -197,7 +199,9 @@ fun ScheduleScreen(
                         taskName = taskName,
                         date = date,
                         onTaskNameChange = { viewModel.onTaskNameChange(it) },
-                        onTaskIconClicked = { viewModel.onTaskIconClicked() }
+                        onTaskIconClicked = { viewModel.onTaskIconClicked() },
+                        isAnIcSelected = isAnIcSelected,
+                        haveName = haveName
                     )
                 }
             }
@@ -396,7 +400,9 @@ fun ColorMenu(
     taskName : String,
     date: String?,
     onTaskNameChange: (String) -> Unit,
-    onTaskIconClicked: () -> Unit
+    onTaskIconClicked: () -> Unit,
+    isAnIcSelected: Boolean,
+    haveName: Boolean
 ) {
     val icons = (1..19).map { "ic_$it" }
     val scrollState = rememberScrollState()
@@ -432,14 +438,17 @@ fun ColorMenu(
         ) {
             Image(
                 painter = painterResource(id = R.drawable.ic_check),
+                colorFilter = ColorFilter.tint(if(isAnIcSelected && haveName) White  else Gray),
                 contentDescription = null,
                 modifier = Modifier
                     .padding(start = 5.dp, end = 5.dp)
                     .size(30.dp)
                     .clickable {
-                        onTaskIconClicked()
-                        if (date != null) {
-                            viewModel.saveMaps(date)
+                        if(isAnIcSelected && haveName) {
+                            onTaskIconClicked()
+                            if (date != null) {
+                                viewModel.saveMaps(date)
+                            }
                         }
                     }
             )
@@ -493,7 +502,6 @@ fun ColorMenu(
                     onBlockClicked = {
                         viewModel.onIconClicked(icon, localIconId)
                         blockNumber = viewModel.updateBlockNumber()!!
-
                         viewModel.updateIcons(icons, icon)
                     },
                 )

@@ -40,8 +40,17 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     DefaultLifecycleObserver {
     private val data = dataStore
 
+    private val _icons = MutableLiveData<MutableList<String>>()
+    private val _icon = MutableLiveData<String>()
+
     private val _isBlockClicked = MutableLiveData<Boolean>(false)
     val isBlockClicked: LiveData<Boolean> = _isBlockClicked
+
+    private val _haveName = MutableLiveData<Boolean>(false)
+    val haveName: LiveData<Boolean> = _haveName
+
+    private val _isAnIcSelected = MutableLiveData<Boolean>(false)
+    val isAnIcSelected: LiveData<Boolean> = _isAnIcSelected
 
     private val _blockColor = MutableLiveData<Color?>(null)
     val blockColor: LiveData<Color?> = _blockColor
@@ -152,6 +161,7 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     }
 
     fun onTaskNameChange(taskName: String) {
+        _haveName.value = taskName.isNotEmpty()
         _taskName.value = taskName
     }
 
@@ -183,13 +193,20 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
 
     fun onTaskIconClicked() {
         Log.i("onTaskIconClicked", "Se ejectuo la funcion onTaskIconClicked()")
+        _haveName.value = false
+        _isAnIcSelected.value = false
         _isBlockClicked.value = false
         _clearBlocks.value = true
         _currentName.value = _taskName.value
+        _taskName.value = ""
         Log.i("onTaskIconClicked", "_currentName.value se seteo en ${_currentName.value}")
 
         for(i in _iconCoords.value!!) {
             setName(i.first, i.second, _currentName.value)
+        }
+
+        for(i in _iconCoords.value!!) {
+            setIcon(i.first, i.second, _icons.value!!.indexOf(_icon.value)+1)
         }
 
         iconCoords.value?.clear()
@@ -200,6 +217,7 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     }
 
     fun onIconClicked(icon: String, localIconId: Int) {
+        _isAnIcSelected.value = true
         _iconBlockCounter.value = _iconBlockCounter.value!! + 1
         _currentBlockIcon.value = icon
         _iconId.value = localIconId
@@ -210,17 +228,19 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     }
 
     fun updateIcons(icons: List<String>, icon: String) {
-        for(i in _iconCoords.value!!) {
-            setIcon(i.first, i.second, icons.indexOf(icon)+1)
-        }
+        _icons.value = icons.toMutableList()
+        _icon.value = icon
     }
 
     private fun setName(blockRow: Int, blockColumn: Int, currentText: String?) {
         _nameMap.value?.get(blockRow)?.set(blockColumn, currentText)
     }
 
-    fun setIcon(blockRow: Int, blockColumn: Int, currentIcon: Int) {
+    private fun setIcon(blockRow: Int, blockColumn: Int, currentIcon: Int) {
         _iconMap.value?.get(blockRow)?.set(blockColumn, currentIcon)
+        Log.i("updateIcons", "Icon setted in _iconMap: " +
+                "${_iconMap.value}")
+
     }
 
     fun saveMaps(date: String) {
@@ -303,7 +323,7 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     }
 
     private suspend fun saveMapsData() {
-        data.edit { preferences -> preferences.clear() }
+        //data.edit { preferences -> preferences.clear() }
 
         Log.i("saveMapsData", "saveMapsData se ejecuto")
         var counter = 0
