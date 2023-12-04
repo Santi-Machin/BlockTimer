@@ -10,6 +10,7 @@ import android.view.Display
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -19,6 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.blocktimer.ui.usecases.schedule.ui.ScheduleScreen
 import com.blocktimer.ui.usecases.schedule.ui.ScheduleViewModel
+import com.blocktimer.ui.usecases.schedule.ui.ScheduleViewModelFactory
 import com.blocktimer.ui.usecases.timer.ui.TimerScreen
 import com.blocktimer.ui.usecases.timer.ui.TimerViewModel
 
@@ -28,8 +30,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val scheduleViewModel: ScheduleViewModel = ScheduleViewModel(dataStore)
-        val timerViewModel: TimerViewModel = TimerViewModel()
+        val scheduleViewModel by viewModels<ScheduleViewModel> { ScheduleViewModelFactory(dataStore)}
+        val timerViewModel by viewModels<TimerViewModel>()
+
         val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val displayManager = getSystemService(DISPLAY_SERVICE) as DisplayManager
         val vibratorService = getSystemService(VIBRATOR_SERVICE) as Vibrator?

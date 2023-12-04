@@ -337,7 +337,13 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
                 outerList.forEachIndexed { outerIndex, innerList ->
                     innerList.forEachIndexed { innerIndex, element ->
                         preference[stringPreferencesKey("nameMapKey[$counter]")] = "nameMap[$key][$outerIndex][$innerIndex]"
+
+                        //invokeVerifiyDataStore("nameMapKey[$counter]")
+
                         preference[stringPreferencesKey("nameMap[$key][$outerIndex][$innerIndex]")] = element ?: "null"
+
+                        //invokeVerifiyDataStore("nameMap[$key][$outerIndex][$innerIndex]")
+
                         counter++
                     }
                 }
@@ -357,6 +363,7 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     }
 
     private suspend fun recoverMapsData() {
+        Log.i("recoverMapsData", "me ejecute")
         try {
             data.data.collect { preferences ->
                 recoverNameMaps(preferences)
@@ -412,7 +419,7 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
 
         for(name in preferencesNames) {
             val preference = preferences[stringPreferencesKey(name)]
-            Log.i("recoverMapsData", "el valor es $preference")
+            Log.i("recoverMapsData", "el valor de $name es $preference")
             if (!preference.isNullOrEmpty()) {
                 Log.i("recoverMapsData", "el valor no es nulo")
                 rebuildNameMap(name, preference)
@@ -449,7 +456,6 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
         }
     }
 
-
     private fun rebuildIconMap(iconMapName: String, iconMapIcon: Int) {
         val regex = Regex("\\[(\\d+/\\d+/\\d+)\\]\\[(\\d+)\\]\\[(\\d+)\\]")
         val matchResult = regex.find(iconMapName)
@@ -467,6 +473,18 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
                 _iconMapsCache.value = currentCache
 
             }
+        }
+    }
+
+    private suspend fun verifyDataStore(key: String) {
+        data.data.collect {preferences ->
+            Log.i("saveMapsData", "En la clave $key se guardo el valor ${preferences[stringPreferencesKey(key)]}")
+        }
+    }
+
+    private fun invokeVerifiyDataStore(key: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            verifyDataStore(key)
         }
     }
 
