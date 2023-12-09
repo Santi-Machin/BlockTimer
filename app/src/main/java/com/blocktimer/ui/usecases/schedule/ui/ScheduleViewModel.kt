@@ -22,10 +22,11 @@ import com.blocktimer.ui.theme.Black
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewModelScope
 import com.blocktimer.ui.theme.Gray
-import com.blocktimer.ui.usecases.schedule.data.MapsData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.forEach
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -155,8 +156,32 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
 
         viewModelScope.launch(Dispatchers.IO) {
             recoverMapsData()
-            Log.i("mapsData", "_nameMapsCache = ${_nameMapsCache.value}")
-            Log.i("mapsData", "_nameMap = ${_nameMap.value}")
+        }
+
+        viewModelScope.launch (Dispatchers.Main) {
+            testingNameMap()
+        }
+    }
+
+    private suspend fun testingNameMap() {
+        val filteredList = mutableListOf<String?>() // Assuming String? is the type of your data
+
+        _nameMapsCache.observeForever { cacheMap ->
+            val dateKey = "2023/12/08" // Replace with the actual date key you're interested in
+
+            if (cacheMap.containsKey(dateKey)) {
+                val valueForDate = cacheMap[dateKey]
+
+                // Filter out null and "null" values
+                val nonNullValues = valueForDate?.flatten()?.filter { it != null && it != "null" } ?: emptyList()
+
+                // Update the filtered list
+                filteredList.clear()
+                filteredList.addAll(nonNullValues)
+
+                // Print the filtered list
+                Log.d("LiveDataObserver", "Filtered List for $dateKey: $filteredList")
+            }
         }
     }
 
@@ -329,7 +354,7 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
         var counter = 0
         var counter1 = 0
 
-        // salvamos un valor que tiene, que tiene un string que sirve de key del valor que agarramos del map y lo
+        // salvamos un valor que tiene un string que sirve de key del valor que agarramos del map y lo
         // guardamos bajo el nombre de esa key.
         data.edit { preference ->
             // los valores de _nameMapsCache se guardan bien en dataStore
@@ -375,7 +400,7 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     }
 
     // Los datos se recuperan de dataStore correctamente despues de la destruccion de la activty y se los pasan rebuildIconMap()
-    private suspend fun recoverIconMaps(preferences: Preferences) {
+    private fun recoverIconMaps(preferences: Preferences) {
         var stop = false
         val preferencesNames: MutableList<String> = mutableListOf()
         var counter = 0
@@ -400,7 +425,7 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
     }
 
     // Los datos se recuperan de dataStore correctamente despues de la destruccion de la activty y se los pasan rebuildNameMap()
-    private suspend fun recoverNameMaps(preferences: Preferences) {
+    private fun recoverNameMaps(preferences: Preferences) {
         Log.i("recoverMapsData", "La funcion recoverNameMaps recivio: $preferences")
         var stop = false
         val preferencesNames: MutableList<String> = mutableListOf()
@@ -439,19 +464,19 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
             viewModelScope.launch(Dispatchers.Main) {
 
                 if (!_nameMapsCache.value?.containsKey(date)!!) {
-                    _nameMapsCache.value = _nameMapsCache.value?.plus((date to _nameMap.value!!))
+                   _nameMapsCache.value = _nameMapsCache.value?.plus((date to _nameMap.value!!))
                 }
+
                 val currentCache = _nameMapsCache.value
                 currentCache?.get(date)?.get(firstNumber.toInt())?.set(secondNumber.toInt(), nameMapPiece)
                 _nameMapsCache.value = currentCache
 
-
                 Log.i("rebuildNameMap", "Se guardó el valor " +
                         "${_nameMapsCache.value?.get(date)?.get(firstNumber.toInt())?.get(secondNumber.toInt())}" +
-                        " en _nameMapsCache.value[$date][${firstNumber.toInt()}][${secondNumber.toInt()}]")
+                        " en][$date][${firstNumber.toInt()}][${secondNumber.toInt()}] ")
 
-                Log.i("rebuildNameMap", "_nameMapsCache = " +
-                        "${_nameMapsCache.value}")
+                //Log.i("rebuildNameMap", "_nameMapsCache = " +
+                //       "${_nameMapsCache.value}")
             }
         }
     }
@@ -476,28 +501,31 @@ open class ScheduleViewModel(dataStore: DataStore<Preferences>): ViewModel(),
         }
     }
 
-    private suspend fun verifyDataStore(key: String) {
-        data.data.collect {preferences ->
-            Log.i("saveMapsData", "En la clave $key se guardo el valor ${preferences[stringPreferencesKey(key)]}")
-        }
-    }
-
-    private fun invokeVerifiyDataStore(key: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            verifyDataStore(key)
-        }
-    }
-
     override fun onPause(owner: LifecycleOwner) {
         super.onPause(owner)
 
         val date = (LocalDate.now()).format(DateTimeFormatter.ofPattern("yyyy/MM/dd"))
         saveMaps(date)
 
-        Log.i("Life", "Se ejecuto onPause()")
-
         viewModelScope.launch(Dispatchers.IO) {
             saveMapsData()
         }
     }
 }
+
+/* Errores
+* Mapas cargados de la bd se guardan en el dia actual
+*
+*
+ */
+
+
+/* Notas
+* Comportamiento: Al dia siguiente si que aparecian las cosas
+* Se guardo cierto valor en el nameMap pero no aparece ->
+* Mapas no cargaron? -> No
+* Comportamiento: Se van guardando pero rapidamente se vuelven a poner en null
+* Este comportamiento tiene algo que ver con loadMaps. Ya que al eliminarlo funciona, pero al ejecutrlo pasando de dia
+* y volver a abrir la app, ocurre el mismo error
+*
+* */

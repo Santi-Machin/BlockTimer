@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val scheduleViewModel by viewModels<ScheduleViewModel> { ScheduleViewModelFactory(dataStore)}
+        val scheduleViewModel by viewModels<ScheduleViewModel> { ScheduleViewModelFactory(dataStore) }
         val timerViewModel by viewModels<TimerViewModel>()
 
         val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager

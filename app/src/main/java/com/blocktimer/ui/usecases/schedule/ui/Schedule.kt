@@ -250,7 +250,7 @@ fun Date(
         }
     }
 
-    viewModel.loadMaps(date = mutableFormattedDate)
+    //viewModel.loadMaps(date = mutableFormattedDate)
     viewModel.updateDate(mutableFormattedDate)
 
     Row(
